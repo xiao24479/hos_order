@@ -1,0 +1,620 @@
+<?php
+// 系统常用函数
+
+//数组编码转换
+function convert_arr_charset($data, $out_charset='UTF-8', $in_charset='GBK'){
+
+	if ($data){
+		foreach ($data as $key => $value) {
+			$data[$key] = mb_convert_encoding($value, $out_charset,$in_charset);
+		}
+	}
+
+	return $data;
+}
+
+//返回json格式
+function returnApiData($ret,$info,$msg){
+	$result = array('ret' => $ret,'data' =>$info, 'msg' => $msg);
+	return json_encode($result);
+}
+
+
+
+//检测预约操作日志中是否有预约电话号码
+function is_log_phone($str){
+	$match = '/患者电话修改为：/';
+	$match1 = '/电话：/';
+
+	if ( preg_match($match, $str) || preg_match($match1, $str) ) {
+		$array = explode('；', $str);
+		foreach ($array as $key => $value) {
+			if ( preg_match($match, $value) || preg_match($match1, $value) ) {
+				$res_arr = explode('：', $value);
+			}
+		}
+		if (!empty($res_arr[1])) {
+			$replace = substr($res_arr[1],0, -4)."****";
+			return str_replace($res_arr[1], $replace, $str);
+		}
+	}
+
+	return $str;
+
+}
+
+
+function p($arr){
+	echo "<pre>";
+	print_r($arr);
+	echo "</pre>";
+}
+
+//检测是否为年月格式
+function checkDateTime($date){
+	if (date('Y-m',strtotime($date)) == $date) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+
+//天数加0
+function ct($t){
+    if (intval($t)<10) {
+        return '0'.$t;
+    } else {
+        return $t;
+    }
+}
+
+
+//递归无限极分类查询
+function trees(&$list,$tag='id',$pid=0,$level=0,$html='&#12288;&#12288;'){
+    static $trees = array();
+    foreach($list as $v){
+        if($v['pid'] == $pid){
+            $v['sort'] = $level;
+            $v['html'] = str_repeat($html,$level);
+            $trees[] = $v;
+            trees($list,$tag,$v[$tag],$level+1);
+        }
+    }
+    return $trees;
+}
+
+/* 数组层级排列  $rows 是查询的数据库记录，$id是自增id，pid是父id 。$child不是数据表里的 */
+function getDataTree($rows, $id='id',$pid = 'parentid',$child = 'child',$root=0) {
+	$tree = array(); // 树
+	if(is_array($rows)){
+		 $array = array();
+		 foreach ($rows as $key=>$item){
+		 $array[$item[$id]] =& $rows[$key];
+	 }
+	 foreach($rows as $key=>$item){
+		 $parentId = $item[$pid];
+		 if($root == $parentId){
+			 $tree[] =&$rows[$key];
+		 }else{
+			 if(isset($array[$parentId])){
+				 $parent =&$array[$parentId];
+				 $parent[$child][]=&$rows[$key];
+			 }
+		 }
+	 }
+	}
+	return $tree;
+}
+
+/**
+ * 截取UTF-8编码下字符串的函数
+ *
+ * @param   string      $str        被截取的字符串
+ * @param   int         $length     截取的长度
+ * @param   bool        $append     是否附加省略号
+ *
+ * @return  string
+ */
+function sub_str($str, $length = 0, $append = true)
+{
+    $str = trim($str);
+    $strlength = strlen($str);
+
+    if ($length == 0 || $length >= $strlength)
+    {
+        return $str;
+    }
+    elseif ($length < 0)
+    {
+        $length = $strlength + $length;
+        if ($length < 0)
+        {
+            $length = $strlength;
+        }
+    }
+
+    if (function_exists('mb_substr'))
+    {
+        $newstr = mb_substr($str, 0, $length, 'utf-8');
+    }
+    elseif (function_exists('iconv_substr'))
+    {
+        $newstr = iconv_substr($str, 0, $length, 'utf-8');
+    }
+    else
+    {
+        //$newstr = trim_right(substr($str, 0, $length));
+        $newstr = substr($str, 0, $length);
+    }
+
+    if ($append && $str != $newstr)
+    {
+        $newstr .= '...';
+    }
+
+    return $newstr;
+}
+
+/* 循环获取option */
+function options($arr, $value_id = '', $text_id = '', $child = '', $ge_str = "&nbsp;&nbsp;&nbsp;&nbsp;", $str = '', $type = 'option', $format_str = '', $check_id = 0, $level = 'rank_level')
+{
+	foreach($arr as $val)
+	{
+		if(($val[$value_id] == 1) && ($val[$text_id] == '管理员'))
+		{
+			continue;
+		}
+		$level_str = '';
+		for($i = 2; $i <= $val[$level];  $i ++)
+		{
+			$level_str .= $ge_str;
+		}
+
+		if($type == 'option')
+		{
+			if($check_id == $val[$value_id])
+			{
+				$str .= "<option value=\"" . $val[$value_id] . "\" selected>" . $level_str . $val[$text_id] . "</option>";
+			}
+			else
+			{
+				$str .= "<option value=\"" . $val[$value_id] . "\">" . $level_str . $val[$text_id] . "</option>";
+			}
+		}
+		elseif($type == 'rank_list')
+		{
+			$str .= sprintf($format_str,$val[$value_id], $level_str, $val['rank_name'], $val[$value_id], $val[$value_id], $val['rank_order'],$val[$value_id], $val[$value_id]);
+		}
+		elseif($type == 'rank_tree')
+		{
+			$str .= sprintf($format_str, $level_str, $val[$value_id], $val[$value_id], $val['parent_id'], $val['rank_name']);
+		}
+		elseif($type == 'keshi_list')
+		{
+			$str .= sprintf($format_str, $val['hos_id'], $level_str, $val['keshi_name'], $val[$value_id], $val[$value_id]);
+		}
+		elseif($type == 'jibing_list')
+		{
+			$str .= sprintf($format_str, $val['jb_id'], $level_str, $val['jb_name'], $val['jb_code'], $val['jb_order'], $val['jb_id'], $val['jb_id']);
+		}
+		if(isset($val[$child]))
+		{
+			$str .= options($val[$child], $value_id, $text_id, $child, $ge_str, '', $type, $format_str, $check_id, $level);
+		}
+	}
+
+	return $str;
+}
+
+//将多维数组转化为规则的二维数组
+function recursive_merge($arr, $id = 'id', $child = 'child') {
+    static $result = array();
+	foreach($arr as $k => $v)
+	{
+		if($k != $child)
+		{
+			$result[$arr[$id]][$k] = $v;
+		}
+	}
+
+	if(isset($arr[$child]) && is_array($arr[$child]))
+	{
+		foreach($arr[$child] as $v)
+		{
+			recursive_merge($v, $id, $child);
+		}
+	}
+
+    return $result;
+}
+
+/**
+ * 读结果缓存文件
+ *
+ * @params  string  $cache_name
+ *
+ * @return  array   $data
+ */
+function read_static_cache($cache_name)
+{
+    static $result = array();
+    if (!empty($result[$cache_name]))
+    {
+        return $result[$cache_name];
+    }
+    $cache_file_path = APPPATH . 'cache/static/' . $cache_name . '.php';
+    if (file_exists($cache_file_path))
+    {
+        include_once($cache_file_path);
+        $result[$cache_name] = $data;
+        return $result[$cache_name];
+    }
+    else
+    {
+        return false;
+    }
+}
+
+/**
+ * 写结果缓存文件
+ *
+ * @params  string  $cache_name
+ * @params  string  $caches
+ *
+ * @return
+ */
+function write_static_cache($cache_name, $caches)
+{
+    $cache_file_path = APPPATH . 'cache/static/' . $cache_name . '.php';
+	if(!file_exists($cache_file_path))
+	{
+		$fp = @fopen($cache_file_path, "a+");
+		fwrite($fp, '1');
+		fclose($fp);
+	}
+    $content = "<?php\r\n";
+    $content .= "\$data = " . var_export($caches, true) . ";\r\n";
+    $content .= "?>";
+    file_put_contents($cache_file_path, $content, LOCK_EX);
+}
+
+/* 清空某个缓存文件 */
+function clear_static_cache($cache_name)
+{
+	$cache_file_path = APPPATH . 'cache/static/' . $cache_name . '.php';
+	if(file_exists($cache_file_path))
+	{
+		@unlink($cache_file_path);
+	}
+}
+
+/**
+ * 获得当前格林威治时间的时间戳
+ *
+ * @return  integer
+ */
+function gmtime()
+{
+    return (time() - date('Z'));
+}
+
+/**
+ * 将GMT时间戳格式化为用户自定义时区日期
+ *
+ * @param  string       $format
+ * @param  integer      $time       该参数必须是一个GMT的时间戳
+ *
+ * @return  string
+ */
+
+function local_date($format, $time = NULL)
+{
+    $timezone = 8; // 8时区
+
+    if ($time === NULL)
+    {
+        $time = gmtime();
+    }
+    elseif ($time <= 0)
+    {
+        return '';
+    }
+
+    $time += ($timezone * 3600);
+
+    return date($format, $time);
+}
+
+
+/**
+ * 获得服务器的时区
+ *
+ * @return  integer
+ */
+function server_timezone()
+{
+    if (function_exists('date_default_timezone_get'))
+    {
+        return date_default_timezone_get();
+    }
+    else
+    {
+        return date('Z') / 3600;
+    }
+}
+
+/**
+ * 转换字符串形式的时间表达式为GMT时间戳
+ *
+ * @param   string  $str
+ *
+ * @return  integer
+ */
+function gmstr2time($str)
+{
+    $time = strtotime($str);
+    return $time;
+}
+
+function shubu($num, $len = 9, $bu = '0'){
+	$num = intval($num);
+	$num_len = strlen($num);
+	if($num_len >= $len)
+	{
+		return $num;
+	}
+
+	$bu_len = $len - $num_len;
+	$bu_str = '';
+	for($i = 1; $i <= $bu_len; $i ++)
+	{
+		$bu_str .= $bu;
+	}
+	$str = $bu_str . strval($num);
+	return $str;
+}
+
+/* 获取一个数组中重复的元素 */
+function array_repeat($arr)
+{
+	if(!is_array($arr)) return $arr;
+
+	$arr1 = array_count_values($arr);
+	$newArr = array();
+	foreach($arr1 as $k=>$v)
+	{
+		if($v>1) array_push($newArr,$k);
+	}
+	return $newArr;
+}
+
+
+// 定义一个函数getIP()
+function getip()
+{
+	global $ip;
+	if (getenv("HTTP_CLIENT_IP"))
+		$ip = getenv("HTTP_CLIENT_IP");
+	else if(getenv("HTTP_X_FORWARDED_FOR"))
+		$ip = getenv("HTTP_X_FORWARDED_FOR");
+	else if(getenv("REMOTE_ADDR"))
+		$ip = getenv("REMOTE_ADDR");
+	else $ip = "Unknow";
+	return $ip;
+}
+
+//获取ip
+function ips() {
+    //strcasecmp 比较两个字符，不区分大小写。返回0，>0，<0。
+    if(getenv('HTTP_CLIENT_IP') && strcasecmp(getenv('HTTP_CLIENT_IP'), 'unknown')) {
+        $ip = getenv('HTTP_CLIENT_IP');
+    } elseif(getenv('HTTP_X_FORWARDED_FOR') && strcasecmp(getenv('HTTP_X_FORWARDED_FOR'), 'unknown')) {
+        $ip = getenv('HTTP_X_FORWARDED_FOR');
+    } elseif(getenv('REMOTE_ADDR') && strcasecmp(getenv('REMOTE_ADDR'), 'unknown')) {
+        $ip = getenv('REMOTE_ADDR');
+    } elseif(isset($_SERVER['REMOTE_ADDR']) && $_SERVER['REMOTE_ADDR'] && strcasecmp($_SERVER['REMOTE_ADDR'], 'unknown')) {
+        $ip = $_SERVER['REMOTE_ADDR'];
+    }
+    $res =  preg_match ( '/[\d\.]{7,15}/', $ip, $matches ) ? $matches [0] : '';
+    return $res;
+}
+
+function mkdirs($dir)
+{
+	if(!is_dir($dir))
+	{
+		if(!mkdirs(dirname($dir))){
+			return false;
+		}
+		if(!mkdir($dir,0777)){
+			return false;
+		}
+	}
+	return true;
+}
+
+function cut_html($str)
+{
+	$search = array('	',
+'
+','&nbsp;','\r\n',chr(10),chr(13)&chr(10));
+	$replace = array(' ',' ',' ',' ',' ',' ');
+	$str = str_replace($search,$replace,$str);
+	return $str;
+}
+
+function unescape($str) {
+	$str = rawurldecode($str);
+	preg_match_all("/(?:%u.{4})|.{4};|&#\d+;|.+/U",$str,$r);
+	$ar = $r[0];
+	foreach($ar as $k=>$v) {
+		if(substr($v,0,2) == "%u")
+			$ar[$k] = mb_convert_encoding(pack("H4",substr($v,-4)), "UTF-8", "UCS-2");
+		elseif(substr($v,0,3) == "")
+			$ar[$k] = mb_convert_encoding(pack("H4",substr($v,3,-1)), "UTF-8", "UCS-2");
+		elseif(substr($v,0,2) == "&#")
+		{
+			echo substr($v,2,-1)."";
+			$ar[$k] = mb_convert_encoding(pack("n",substr($v,2,-1)), "UTF-8", "UCS-2");
+		}
+	}
+	return join("",$ar);
+}
+function https_post($url, $data = null) {
+	$curl = curl_init();
+	curl_setopt($curl, CURLOPT_URL, $url);
+	curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
+	curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, FALSE);
+	if (!empty($data)){ curl_setopt($curl, CURLOPT_POST, 1);
+	curl_setopt($curl, CURLOPT_POSTFIELDS, $data); }
+	curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+	$output = curl_exec($curl); curl_close($curl); return $output;
+}
+function https_get($url)
+	{
+		$oCurl = curl_init();
+		curl_setopt($oCurl, CURLOPT_URL, $url);
+		curl_setopt($oCurl, CURLOPT_RETURNTRANSFER, 1 );
+		$sContent = curl_exec($oCurl);
+		$aStatus = curl_getinfo($oCurl);
+		curl_close($oCurl);
+		if(intval($aStatus["http_code"])==200){
+			return $sContent;
+		}else{
+			return false;
+		}
+	}
+	//字符串加密函数
+	function sys_auth($string, $operation = 'ENCODE', $key = '', $expiry = 0) {
+		$key_length = 4;
+		$key = md5($key != '' ? $key : 'GTwVRuoqSPoAEYOagDizmswCyzYgyrg2');//未设置密钥的启用系统密钥
+		$fixedkey = md5($key);// 固定密码
+		$egiskeys = md5(substr($fixedkey, 16, 16));  // 取固定密码的后16位
+		// 变化中的密码，加密时取md5加密微妙的后4位，解密取字符串的前4位，
+		$runtokey = $key_length ? ($operation == 'ENCODE' ? substr(md5(microtime(true)), -$key_length) : substr($string, 0, $key_length)) : '';
+		//
+		$keys = md5(substr($runtokey, 0, 16) . substr($fixedkey, 0, 16) . substr($runtokey, 16) . substr($fixedkey, 16));
+
+		$string = $operation == 'ENCODE' ? sprintf('%010d', $expiry ? $expiry + time() : 0).substr(md5($string.$egiskeys), 0, 16) . $string : base64_decode(strtr(substr($string, $key_length), '-_', '+/'));
+		if($operation=='ENCODE'){
+			$string .= substr(md5(microtime(true)), -4);
+		}
+		if(function_exists('mcrypt_encrypt')==true){
+			$result=sys_auth_ex($string, $operation, $fixedkey);
+		}else{
+			$i = 0; $result = '';
+			$string_length = strlen($string);
+			for ($i = 0; $i < $string_length; $i++){
+				$result .= chr(ord($string{$i}) ^ ord($keys{$i % 32}));
+			}
+		}
+		if($operation=='DECODE'){
+			$result = substr($result, 0,-4);
+		}
+		if($operation == 'ENCODE') {
+			return $runtokey . rtrim(strtr(base64_encode($result), '+/', '-_'), '=');
+		} else {
+			if((substr($result, 0, 10) == 0 || substr($result, 0, 10) - time() > 0) && substr($result, 10, 16) == substr(md5(substr($result, 26).$egiskeys), 0, 16)) {
+				return substr($result, 26);
+			} else {
+				return '';
+			}
+		}
+	}
+	function sys_auth_ex($string,$operation = 'ENCODE',$key)
+	{
+		$encrypted_data="";
+		$td = mcrypt_module_open('rijndael-256', '', 'ecb', '');
+		$iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($td), MCRYPT_RAND);
+		$key = substr($key, 0, mcrypt_enc_get_key_size($td));
+		mcrypt_generic_init($td, $key, $iv);
+		if($operation=='ENCODE'){
+			$encrypted_data = mcrypt_generic($td, $string);
+		}else{
+			if(!empty($string)){
+				$encrypted_data = rtrim(mdecrypt_generic($td, $string));
+			}
+		}
+		mcrypt_generic_deinit($td);
+		mcrypt_module_close($td);
+		return $encrypted_data;
+	}
+
+	function array2string($data, $isformdata = 1) {
+	if($data == '') return '';
+	if($isformdata) $data = new_stripslashes($data);
+	return addslashes(var_export($data, TRUE));
+	}
+	function string2array($data) {
+	if($data == '') return array();
+	eval("\$array = $data;");
+	return $array;
+	}
+
+/**
+ * 返回经stripslashes处理过的字符串或数组
+ * @param $string 需要处理的字符串或数组
+ * @return mixed
+ */
+function new_stripslashes($string) {
+	if(!is_array($string)) return stripslashes($string);
+	foreach($string as $key => $val) $string[$key] = new_stripslashes($val);
+	return $string;
+}
+
+
+/**
+ * 返回来路
+ *
+ * @access public
+ * @param string $anchor 附加地址
+ * @param string $default 默认来路
+ * @return void
+ */
+if ( ! function_exists('go_back'))
+{
+	function go_back($suffix = NULL, $default = NULL)
+	{
+	    //获取来源
+	    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+
+	    //判断来源
+	    if (!empty($referer))
+	    {
+	        // 来自Typecho
+	        if (!empty($suffix))
+	        {
+	            $parts = parse_url($referer);
+	            $myParts = parse_url($suffix);
+
+	            if (isset($myParts['fragment']))
+	            {
+	                $parts['fragment'] = $myParts['fragment'];
+	            }
+
+	            if (isset($myParts['query']))
+	            {
+	                $args = array();
+	                if (isset($parts['query']))
+	                {
+	                    parse_str($parts['query'], $args);
+	                }
+
+	                parse_str($myParts['query'], $currentArgs);
+	                $args = array_merge($args, $currentArgs);
+	                $parts['query'] = http_build_query($args);
+	            }
+
+	            $referer = build_url($parts);
+	        }
+
+	        redirect($referer);
+	    }
+	    else if (!empty($default))
+	    {
+	        redirect($default);
+	    }
+	}
+}
+?>
